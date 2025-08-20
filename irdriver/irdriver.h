@@ -26,4 +26,24 @@
 #   define PERR(fmt, args...) fprintf(stderr, fmt, ## args)
 #endif //!__KERNEL__
 
+
+# define GPIO_RECEIVER_DATA     (17)
+# define GPIO_LED               (24)
+# define GPIO_RECEIVER_DATA_LBL "GPIO_17"
+# define GPIO_LED_LBL           "GPIO_24"
+
+typedef enum {
+    OUTPUT,
+    INPUT
+} direction_t;
+
+typedef enum {
+    LOW = 0,
+    HIGH
+} GPIO_STATE;
+
+struct irdriver_dev {
+    struct cdev cdev;
+};
+
 #endif //!IRDRIVER_H
