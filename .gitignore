@@ -1,0 +1,9 @@
+irdriver/.*
+irdriver/*.ko
+irdriver/*.mod
+irdriver/*.mod.c
+irdriver/*.o
+irdriver/Module.symvers
+irdriver/modules.order
+irdriver/oe-logs
+irdriver/oe-workdir

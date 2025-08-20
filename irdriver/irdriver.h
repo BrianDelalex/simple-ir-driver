@@ -20,4 +20,10 @@
 #   define PDEBUG(fmt, args...) /* not debugging: nothing */
 #endif //!IRDRIVER_DEBUG
 
+#ifdef __KERNEL__
+#   define PERR(fmt, args...) printk( KERN_ERR "irdriver: [ERROR] " fmt, ## args)
+#else
+#   define PERR(fmt, args...) fprintf(stderr, fmt, ## args)
+#endif //!__KERNEL__
+
 #endif //!IRDRIVER_H
