@@ -12,8 +12,9 @@
 #include <linux/delay.h>
 #include <linux/cdev.h>
 #include <linux/fs.h>
+#include <linux/interrupt.h>
 
-# include "irdriver.h"
+#include "irdriver.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("BrianDelalex");
@@ -24,6 +25,39 @@ int irdriver_minor = 0;
 dev_t dev = 0;
 struct irdriver_dev irdriver_device;
 static struct class *irdriver_class;
+
+unsigned int gpio_irq_number;
+
+/*************************
+*   IRQ HANDLERS
+**************************/
+
+static irqreturn_t ir_signal_handler(int irq, void *dev)
+{
+    unsigned long flags = 0;
+    struct ir_data* ir_data;
+
+    local_irq_save(flags);
+
+    ir_data = kmalloc(sizeof(struct ir_data), GFP_KERNEL);
+    if (ir_data == NULL) {
+        PERR("ir_signal_handler: Out of memory! Can't process signal.");
+        goto restore_irq;
+    }
+
+    memset(ir_data, 0, sizeof(struct ir_data));
+
+    PDEBUG("IRQ Handler called.");
+
+    kfree(ir_data);
+restore_irq:
+    local_irq_restore(flags);
+    return IRQ_HANDLED;
+}
+
+/*************************
+*   FILE OPERATIONS 
+**************************/
 
 int irdriver_open(struct inode *inode, struct file* filp)
 {
@@ -102,6 +136,7 @@ static int irdriver_setup_cdev(struct irdriver_dev *dev)
 static int __init irdriver_init(void)
 {
     PDEBUG("irdriver init.\n");
+
     int rc;
 
     rc = alloc_chrdev_region(&dev, irdriver_minor, 1, "irdriver");
@@ -133,6 +168,16 @@ static int __init irdriver_init(void)
         goto r_gpio_led;
     }
 
+    gpio_irq_number = gpio_to_irq(GPIO_RECEIVER_DATA);
+    if (request_irq(gpio_irq_number,
+                    (void *)ir_signal_handler,
+                    IRQF_TRIGGER_LOW | IRQF_IRQPOLL, 
+                    "irdriver", 
+                    NULL)) {
+        PERR("cannot register IRQ!");
+        goto r_gpio_led;
+    }
+
     return 0;
 
 r_gpio_led:
@@ -151,6 +196,8 @@ r_chrdev:
 static void __exit irdriver_exit(void)
 {
     PDEBUG("irdriver exit.\n");
+
+    free_irq(gpio_irq_number, NULL);
 
     gpio_unexport(GPIO_LED);
     gpio_free(GPIO_LED);
