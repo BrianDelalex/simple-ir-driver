@@ -15,6 +15,7 @@
 #include <linux/interrupt.h>
 
 #include "irdriver.h"
+#include "irsignal.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("BrianDelalex");
@@ -36,8 +37,11 @@ static irqreturn_t ir_signal_handler(int irq, void *dev)
 {
     unsigned long flags = 0;
     struct ir_data* ir_data;
+    int i = 0;
+    int pulses;
 
     local_irq_save(flags);
+    PDEBUG("IRQ Handler called.\n");
 
     ir_data = kmalloc(sizeof(struct ir_data), GFP_KERNEL);
     if (ir_data == NULL) {
@@ -47,7 +51,11 @@ static irqreturn_t ir_signal_handler(int irq, void *dev)
 
     memset(ir_data, 0, sizeof(struct ir_data));
 
-    PDEBUG("IRQ Handler called.");
+    pulses = read_ir_signal(ir_data);
+
+    PDEBUG("Catch %d pulse signal\n", pulses);
+
+    process_irsignal(identify_signal(ir_data, pulses));
 
     kfree(ir_data);
 restore_irq:

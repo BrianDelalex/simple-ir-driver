@@ -46,10 +46,4 @@ struct irdriver_dev {
     struct cdev cdev;
 };
 
-# define MAX_PULSES 50
-
-struct ir_data {
-    int pulses[MAX_PULSES][2];
-};
-
 #endif //!IRDRIVER_H

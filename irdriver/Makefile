@@ -13,6 +13,7 @@ EXTRA_CFLAGS += $(DEBFLAGS)
 # Check if we are into the kernel build system or not.
 ifneq ($(KERNELRELEASE),)
   obj-m	:= irdriver.o
+  irdriver-objs := irdriver_main.o irsignal.o irsignal_pulses.o
 else
 
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build

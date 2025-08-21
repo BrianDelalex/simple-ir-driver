@@ -6,21 +6,13 @@
 **
 \*****************************************************************************/
 
-#ifndef IR_SIGNAL_H
-#define IR_SIGNAL_H
+#include <linux/cdev.h>
+#include <linux/slab.h>
 
-#ifdef ARDUINO
-# define SIGNAL_TYPE(var_name) const int var_name[] PROGMEM
-#else
-# define SIGNAL_TYPE(var_name) const int var_name[]
-#endif //!ARDUINO
+#include "irdriver.h"
+#include "irsignal.h"
 
-typedef enum {
-    VOL_MINUS,
-    UNKNOW
-} irsignal_t;
-
-SIGNAL_TYPE(VOL_MINUS_SIGNAL) = {
+const int VOL_MINUS_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     934, 462,
     62, 54,
@@ -62,7 +54,7 @@ SIGNAL_TYPE(VOL_MINUS_SIGNAL) = {
     62, 0
 };
 
-SIGNAL_TYPE(PLAY_SIGNAL) = {
+const int PLAY_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     932, 462,
     62, 54,
@@ -102,7 +94,7 @@ SIGNAL_TYPE(PLAY_SIGNAL) = {
     62, 0
 };
 
-SIGNAL_TYPE(VOL_PLUS_SIGNAL) = {
+const int VOL_PLUS_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     932, 462,
     62, 56,
@@ -142,7 +134,7 @@ SIGNAL_TYPE(VOL_PLUS_SIGNAL) = {
     60, 0
 };
 
-SIGNAL_TYPE(SETUP_SIGNAL) = {
+const int SETUP_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     934, 462,
     62, 56,
@@ -184,7 +176,7 @@ SIGNAL_TYPE(SETUP_SIGNAL) = {
     60, 0
 };
 
-SIGNAL_TYPE(PREVIOUS_SIGNAL) = {
+const int PREVIOUS_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     932, 462,
     62, 54,
@@ -224,7 +216,7 @@ SIGNAL_TYPE(PREVIOUS_SIGNAL) = {
     62, 0
 };
 
-SIGNAL_TYPE(STOP_MODE_SIGNAL) = {
+const int STOP_MODE_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     930, 462,
     62, 54,
@@ -264,7 +256,7 @@ SIGNAL_TYPE(STOP_MODE_SIGNAL) = {
     62, 0
 };
 
-SIGNAL_TYPE(CHNL_MINUS_SIGNAL) = {
+const int CHNL_MINUS_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     934, 460,
     64, 52,
@@ -304,7 +296,7 @@ SIGNAL_TYPE(CHNL_MINUS_SIGNAL) = {
     62, 0
 };
 
-SIGNAL_TYPE(ENTER_SIGNAL) = {
+const int ENTER_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     930, 462,
     62, 58,
@@ -344,7 +336,7 @@ SIGNAL_TYPE(ENTER_SIGNAL) = {
     60, 0
 };
 
-SIGNAL_TYPE(CHNL_PLUS_SIGNAL) = {
+const int CHNL_PLUS_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     930, 462,
     60, 56,
@@ -384,7 +376,7 @@ SIGNAL_TYPE(CHNL_PLUS_SIGNAL) = {
     64, 0
 };
 
-SIGNAL_TYPE(CHNL_ZERO_SIGNAL) = {
+const int CHNL_ZERO_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     932, 462,
     60, 56,
@@ -426,7 +418,7 @@ SIGNAL_TYPE(CHNL_ZERO_SIGNAL) = {
     62, 0
 };
 
-SIGNAL_TYPE(NEXT_SIGNAL) = {
+const int NEXT_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     932, 462,
     60, 56,
@@ -466,7 +458,7 @@ SIGNAL_TYPE(NEXT_SIGNAL) = {
     62, 0
 };
 
-SIGNAL_TYPE(BACK_SIGNAL) = {
+const int BACK_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     930, 462,
     62, 56,
@@ -506,7 +498,7 @@ SIGNAL_TYPE(BACK_SIGNAL) = {
     60, 0
 };
 
-SIGNAL_TYPE(CHNL_ONE_SIGNAL) = {
+const int CHNL_ONE_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     938, 460,
     62, 54,
@@ -546,7 +538,7 @@ SIGNAL_TYPE(CHNL_ONE_SIGNAL) = {
     64, 0
 };
 
-SIGNAL_TYPE(CHNL_TWO_SIGNAL) = {
+const int CHNL_TWO_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     934, 460,
     64, 52,
@@ -586,7 +578,7 @@ SIGNAL_TYPE(CHNL_TWO_SIGNAL) = {
     64, 0
 };
 
-SIGNAL_TYPE(CHNL_THREE_SIGNAL) = {
+const int CHNL_THREE_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     930, 462,
     64, 52,
@@ -626,7 +618,7 @@ SIGNAL_TYPE(CHNL_THREE_SIGNAL) = {
     60, 0
 };
 
-SIGNAL_TYPE(CHNL_FOUR_SIGNAL) = {
+const int CHNL_FOUR_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     934, 462,
     62, 54,
@@ -666,7 +658,7 @@ SIGNAL_TYPE(CHNL_FOUR_SIGNAL) = {
     62, 0
 };
 
-SIGNAL_TYPE(CHNL_FIVE_SIGNAL) = {
+const int CHNL_FIVE_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     942, 456,
     64, 52,
@@ -706,7 +698,7 @@ SIGNAL_TYPE(CHNL_FIVE_SIGNAL) = {
     60, 0
 };
 
-SIGNAL_TYPE(CHNL_SIX_SIGNAL) = {
+const int CHNL_SIX_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     932, 460,
     64, 52,
@@ -746,7 +738,7 @@ SIGNAL_TYPE(CHNL_SIX_SIGNAL) = {
     64, 0
 };
 
-SIGNAL_TYPE(CHNL_SEVEN_SIGNAL) = {
+const int CHNL_SEVEN_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     932, 460,
     64, 52,
@@ -786,7 +778,7 @@ SIGNAL_TYPE(CHNL_SEVEN_SIGNAL) = {
     64, 0
 };
 
-SIGNAL_TYPE(CHNL_EIGHT_SIGNAL) = {
+const int CHNL_EIGHT_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     932, 460,
     64, 52,
@@ -828,7 +820,7 @@ SIGNAL_TYPE(CHNL_EIGHT_SIGNAL) = {
     62, 0
 };
 
-SIGNAL_TYPE(CHNL_NINE_SIGNAL) = {
+const int CHNL_NINE_SIGNAL[] = {
 // ON, OFF (in 10's of microseconds)
     926, 464,
     60, 56,
@@ -868,17 +860,48 @@ SIGNAL_TYPE(CHNL_NINE_SIGNAL) = {
     56, 0
 };
 
+# define ADD_SIGNAL_PULSES(arr, pulse_arr, cd)                \
+    arr->pulses = pulse_arr;                                    \
+    arr->pulses_count = sizeof(pulse_arr) / (sizeof(int));    \
+    arr->code = cd;                                           \
+    arr->valid = true;                                          \
 
-# define PULSE_TIMEOUT  65000
-# define MAX_PULSES     50
-# define RESOLUTION     20
-# define FUZZINESS      20
+struct signal_pulses_s* get_signal_pulses_array(int* size)
+{
+    static const int array_size = 21;
+    struct signal_pulses_s* sig_pulses_arr;
+    
+    sig_pulses_arr = kmalloc(sizeof(struct signal_pulses_s) * array_size,
+                             GFP_KERNEL);
 
-struct ir_data {
-    int pulses[MAX_PULSES][2];
-};
+    if (sig_pulses_arr == NULL) {
+        PERR("Out of memory! in get_signal_pulses_array.");
+        return NULL;
+    }
 
-int read_ir_signal(struct ir_data *ir_data);
-irsignal_t identify_signal(struct ir_data *ir_data, int pulses);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[0])), VOL_MINUS_SIGNAL, VOL_MINUS);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[1])), PLAY_SIGNAL, PLAY);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[2])), VOL_PLUS_SIGNAL, VOL_PLUS);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[3])), SETUP_SIGNAL, SETUP);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[4])), PREVIOUS_SIGNAL, PREVIOUS);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[5])), STOP_MODE_SIGNAL, STOP_MODE);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[6])), CHNL_MINUS_SIGNAL, CHNL_MINUS);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[7])), ENTER_SIGNAL, ENTER);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[8])), CHNL_PLUS_SIGNAL, CHNL_PLUS);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[9])), CHNL_ZERO_SIGNAL, CHNL_ZERO);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[10])), NEXT_SIGNAL, NEXT);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[11])), BACK_SIGNAL, BACK);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[12])), CHNL_ONE_SIGNAL, CHNL_ONE);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[13])), CHNL_TWO_SIGNAL, CHNL_TWO);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[14])), CHNL_THREE_SIGNAL, CHNL_THREE);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[15])), CHNL_FOUR_SIGNAL, CHNL_FOUR);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[16])), CHNL_FIVE_SIGNAL, CHNL_FIVE);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[17])), CHNL_SIX_SIGNAL, CHNL_SIX);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[18])), CHNL_SEVEN_SIGNAL, CHNL_SEVEN);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[19])), CHNL_EIGHT_SIGNAL, CHNL_EIGHT);
+    ADD_SIGNAL_PULSES((&(sig_pulses_arr[20])), CHNL_NINE_SIGNAL, CHNL_NINE);
 
-#endif //!IR_SIGNAL_H
+
+    *size = array_size;
+    return sig_pulses_arr;
+}
