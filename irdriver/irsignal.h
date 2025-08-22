@@ -54,12 +54,14 @@ struct signal_pulses_s {
 
 struct ir_data {
     int pulses[MAX_PULSES][2];
+    int pulses_count;
 };
 
-int read_ir_signal(struct ir_data *ir_data);
-irsignal_t identify_signal(struct ir_data *ir_data, int pulses);
+void read_ir_signal(struct ir_data *ir_data);
+irsignal_t identify_signal(struct ir_data *ir_data);
 struct signal_pulses_s* get_signal_pulses_array(int* size);
 void process_irsignal(irsignal_t sig);
+int thread_signal_handling(void *data);
 
 
 #endif //!IR_SIGNAL_H

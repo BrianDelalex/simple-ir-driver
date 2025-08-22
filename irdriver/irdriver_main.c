@@ -13,9 +13,14 @@
 #include <linux/cdev.h>
 #include <linux/fs.h>
 #include <linux/interrupt.h>
+#include <linux/kthread.h>
+#include <linux/completion.h>
+#include <linux/mutex.h>
 
 #include "irdriver.h"
 #include "irsignal.h"
+#include "irdriver_circular_buffer.h"
+#include "led.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("BrianDelalex");
@@ -29,6 +34,13 @@ static struct class *irdriver_class;
 
 unsigned int gpio_irq_number;
 
+
+static struct task_struct *signal_hdl_thread;
+struct irdriver_circular_buffer *circular_buffer;
+struct mutex circular_buffer_mtx;
+struct completion signal_recv_completion;
+
+
 /*************************
 *   IRQ HANDLERS
 **************************/
@@ -37,8 +49,6 @@ static irqreturn_t ir_signal_handler(int irq, void *dev)
 {
     unsigned long flags = 0;
     struct ir_data* ir_data;
-    int i = 0;
-    int pulses;
 
     local_irq_save(flags);
     PDEBUG("IRQ Handler called.\n");
@@ -51,13 +61,14 @@ static irqreturn_t ir_signal_handler(int irq, void *dev)
 
     memset(ir_data, 0, sizeof(struct ir_data));
 
-    pulses = read_ir_signal(ir_data);
+    read_ir_signal(ir_data);
 
-    PDEBUG("Catch %d pulse signal\n", pulses);
+    PDEBUG("Catch %d pulse signal\n", ir_data->pulses_count);
+    mutex_lock(&circular_buffer_mtx);
+    irdriver_circular_buffer_add_entry(circular_buffer, ir_data);
+    mutex_unlock(&circular_buffer_mtx);
+    complete(&signal_recv_completion);
 
-    process_irsignal(identify_signal(ir_data, pulses));
-
-    kfree(ir_data);
 restore_irq:
     local_irq_restore(flags);
     return IRQ_HANDLED;
@@ -186,8 +197,31 @@ static int __init irdriver_init(void)
         goto r_gpio_led;
     }
 
-    return 0;
+    init_led_timer();
 
+    circular_buffer = kmalloc(sizeof(struct irdriver_circular_buffer), GFP_KERNEL);
+    if (circular_buffer == NULL) {
+        PERR("Out of memory! Can't alloc circular_buffer\n");
+        goto r_led_timer; 
+    }
+
+    mutex_init(&circular_buffer_mtx);
+
+    init_completion(&signal_recv_completion);
+
+    signal_hdl_thread = kthread_run(thread_signal_handling, NULL, "irdriver_thread");
+    if (!signal_hdl_thread) {
+        PERR("kthread creation failed.\n");
+        goto r_circular_buffer;
+    }
+
+
+    return 0;
+r_circular_buffer:
+    kfree(circular_buffer);
+r_led_timer:
+    release_led_timer();
+    free_irq(gpio_irq_number, NULL);
 r_gpio_led:
     gpio_free(GPIO_LED);
 r_gpio_receiver_data:
@@ -204,6 +238,10 @@ r_chrdev:
 static void __exit irdriver_exit(void)
 {
     PDEBUG("irdriver exit.\n");
+
+    kfree(circular_buffer);
+
+    release_led_timer();
 
     free_irq(gpio_irq_number, NULL);
 

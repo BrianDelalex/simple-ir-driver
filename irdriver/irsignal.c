@@ -10,11 +10,20 @@
 #include <linux/delay.h>
 #include <linux/gpio.h>
 #include <linux/cdev.h>
+#include <linux/kthread.h>
+#include <linux/completion.h>
+#include <linux/mutex.h>
 
 #include "irsignal.h"
 #include "irdriver.h"
+#include "irdriver_circular_buffer.h"
+#include "led.h"
 
-int read_ir_signal(struct ir_data *ir_data)
+extern struct irdriver_circular_buffer *circular_buffer;
+extern struct mutex circular_buffer_mtx;
+extern struct completion signal_recv_completion;
+
+void read_ir_signal(struct ir_data *ir_data)
 {
     int currentpulse = 0;
 
@@ -26,7 +35,8 @@ int read_ir_signal(struct ir_data *ir_data)
             udelay(RESOLUTION);
 
             if (highpulse >= PULSE_TIMEOUT || currentpulse == MAX_PULSES) {
-                return currentpulse;
+                ir_data->pulses_count = currentpulse;
+                return;
             }
         }
 
@@ -36,7 +46,8 @@ int read_ir_signal(struct ir_data *ir_data)
             lowpulse++;
             udelay(RESOLUTION);
             if (highpulse >= PULSE_TIMEOUT || currentpulse == MAX_PULSES) {
-                return currentpulse;
+                ir_data->pulses_count = currentpulse;
+                return;
             }
         }
 
@@ -46,8 +57,9 @@ int read_ir_signal(struct ir_data *ir_data)
     }
 }
 
-irsignal_t identify_signal(struct ir_data *ir_data, int pulses)
+irsignal_t identify_signal(struct ir_data *ir_data)
 {
+    int pulses = ir_data->pulses_count;
     int count = 0;
     int pulses_arr_size;
     struct signal_pulses_s* pulses_arr = get_signal_pulses_array(&pulses_arr_size);
@@ -166,5 +178,37 @@ void process_irsignal(irsignal_t sig)
         break;
     default:
         PDEBUG("Unknow Signal\n");
+    }
+}
+
+int thread_signal_handling(void *data)
+{
+    struct ir_data *ir_data;
+    while (1) {
+        wait_for_completion(&signal_recv_completion);
+        PDEBUG("Completion !\n");
+        if (kthread_should_stop()) {
+            return 0;
+        }
+        mutex_lock(&circular_buffer_mtx);
+        ir_data = irdriver_circular_buffer_read(circular_buffer);
+        mutex_unlock(&circular_buffer_mtx);
+
+        if (!ir_data)
+            continue;
+        int i = 0;
+        PDEBUG("ON, OFF\n");
+        while (i < ir_data->pulses_count) {
+            PDEBUG("%d, %d", ir_data->pulses[i][1] * RESOLUTION / 10, ir_data->pulses[i + 1][0] * RESOLUTION / 10);
+            i++;
+        }
+
+        irsignal_t sig = identify_signal(ir_data);
+        if (sig != UNKNOW) {
+            blink_led();
+        }
+        kfree(ir_data);
+        process_irsignal(sig);
+        reinit_completion(&signal_recv_completion);
     }
 }
