@@ -9,6 +9,8 @@
 #ifndef IR_SIGNAL_H
 #define IR_SIGNAL_H
 
+# include <linux/interrupt.h>
+
 #ifdef ARDUINO
 # define SIGNAL_TYPE(var_name) const int var_name[] PROGMEM
 #else
@@ -61,7 +63,7 @@ void read_ir_signal(struct ir_data *ir_data);
 irsignal_t identify_signal(struct ir_data *ir_data);
 struct signal_pulses_s* get_signal_pulses_array(int* size);
 void process_irsignal(irsignal_t sig);
-int thread_signal_handling(void *data);
+irqreturn_t thread_signal_handling(int irq, void *dev_id);
 
 
 #endif //!IR_SIGNAL_H

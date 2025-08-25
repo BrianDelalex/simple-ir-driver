@@ -24,7 +24,6 @@
 
 extern struct irdriver_circular_buffer *circular_buffer;
 extern struct mutex circular_buffer_mtx;
-extern struct completion signal_recv_completion;
 
 extern struct registered_app *registered_app_head;
 
@@ -146,15 +145,12 @@ void process_irsignal(irsignal_t sig)
     switch (sig) {
     case VOL_MINUS:
         PDEBUG("Signal catch: VOL_MINUS\n");
-        signal_registered_app(BTN_VOL_MINUS);
         break;
     case PLAY:
         PDEBUG("Signal catch: PLAY\n");
-        signal_registered_app(BTN_PLAY);
         break;
     case VOL_PLUS:
         PDEBUG("Signal catch: VOL_PLUS\n");
-        signal_registered_app(BTN_VOL_PLUS);
         break;
     case SETUP:
         PDEBUG("Signal catch: SETUP\n");
@@ -212,37 +208,30 @@ void process_irsignal(irsignal_t sig)
         break;
     default:
         PDEBUG("Unknow Signal\n");
+        return;
     }
+    signal_registered_app(sig);
 }
 
-int thread_signal_handling(void *data)
+irqreturn_t thread_signal_handling(int irq, void *dev_id)
 {
     struct ir_data *ir_data;
-    while (1) {
-        wait_for_completion(&signal_recv_completion);
-        PDEBUG("Completion !\n");
-        if (kthread_should_stop()) {
-            return 0;
-        }
-        mutex_lock(&circular_buffer_mtx);
-        ir_data = irdriver_circular_buffer_read(circular_buffer);
-        mutex_unlock(&circular_buffer_mtx);
-
-        if (!ir_data)
-            continue;
-        int i = 0;
-        PDEBUG("ON, OFF\n");
-        while (i < ir_data->pulses_count) {
-            PDEBUG("%d, %d", ir_data->pulses[i][1] * RESOLUTION / 10, ir_data->pulses[i + 1][0] * RESOLUTION / 10);
-            i++;
-        }
-
-        irsignal_t sig = identify_signal(ir_data);
-        if (sig != UNKNOW) {
-            blink_led();
-        }
-        kfree(ir_data);
-        process_irsignal(sig);
-        reinit_completion(&signal_recv_completion);
+    mutex_lock(&circular_buffer_mtx);
+    ir_data = irdriver_circular_buffer_read(circular_buffer);
+    mutex_unlock(&circular_buffer_mtx);
+    if (!ir_data)
+        return IRQ_HANDLED;
+    int i = 0;
+    PDEBUG("ON, OFF\n");
+    while (i < ir_data->pulses_count) {
+        PDEBUG("%d, %d", ir_data->pulses[i][1] * RESOLUTION / 10, ir_data->pulses[i + 1][0] * RESOLUTION / 10);
+        i++;
     }
+    irsignal_t sig = identify_signal(ir_data);
+    if (sig != UNKNOW) {
+        blink_led();
+    }
+    kfree(ir_data);
+    process_irsignal(sig);
+    return IRQ_HANDLED;
 }

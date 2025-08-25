@@ -13,11 +13,29 @@
 # define CMD_REGISTER 1
 # define CMD_UNREGISTER 2
 
-
 // Remote control buttons
-# define SIGNAL_IR      SIGRTMIN + 1
-# define BTN_VOL_MINUS  1
-# define BTN_PLAY       2
-# define BTN_VOL_PLUS   3
+enum {
+ BTN_VOL_MINUS = 0,
+ BTN_PLAY,     
+ BTN_VOL_PLUS, 
+ BTN_SETUP,    
+ BTN_PREVIOUS, 
+ BTN_STOP,     
+ BTN_CHNL_MINU,
+ BTN_ENTER,    
+ BTN_CHNL_PLUS,
+ BTN_ZERO,      
+ BTN_NEXT,      
+ BTN_BACK,      
+ BTN_ONE,       
+ BTN_TWO,       
+ BTN_THREE,     
+ BTN_FOUR,      
+ BTN_FIVE,      
+ BTN_SIX,       
+ BTN_SEVEN,     
+ BTN_EIGHT,     
+ BTN_NINE,
+};      
 
 #endif//!IRDRIVER_API_H

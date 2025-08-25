@@ -38,10 +38,8 @@ unsigned int gpio_irq_number;
 
 struct registered_app *registered_app_head = NULL;
 
-static struct task_struct *signal_hdl_thread;
 struct irdriver_circular_buffer *circular_buffer;
 struct mutex circular_buffer_mtx;
-struct completion signal_recv_completion;
 
 
 /*************************
@@ -59,7 +57,8 @@ static irqreturn_t ir_signal_handler(int irq, void *dev)
     ir_data = kmalloc(sizeof(struct ir_data), GFP_KERNEL);
     if (ir_data == NULL) {
         PERR("ir_signal_handler: Out of memory! Can't process signal.");
-        goto restore_irq;
+        local_irq_restore(flags);
+        return IRQ_HANDLED;
     }
 
     memset(ir_data, 0, sizeof(struct ir_data));
@@ -70,11 +69,9 @@ static irqreturn_t ir_signal_handler(int irq, void *dev)
     mutex_lock(&circular_buffer_mtx);
     irdriver_circular_buffer_add_entry(circular_buffer, ir_data);
     mutex_unlock(&circular_buffer_mtx);
-    complete(&signal_recv_completion);
 
-restore_irq:
     local_irq_restore(flags);
-    return IRQ_HANDLED;
+    return IRQ_WAKE_THREAD;
 }
 
 /*************************
@@ -255,9 +252,10 @@ static int __init irdriver_init(void)
     }
 
     gpio_irq_number = gpio_to_irq(GPIO_RECEIVER_DATA);
-    if (request_irq(gpio_irq_number,
+    if (request_threaded_irq(gpio_irq_number,
                     (void *)ir_signal_handler,
-                    IRQF_TRIGGER_LOW | IRQF_IRQPOLL, 
+                    thread_signal_handling,
+                    IRQF_TRIGGER_LOW, 
                     "irdriver", 
                     NULL)) {
         PERR("cannot register IRQ!");
@@ -274,18 +272,8 @@ static int __init irdriver_init(void)
 
     mutex_init(&circular_buffer_mtx);
 
-    init_completion(&signal_recv_completion);
-
-    signal_hdl_thread = kthread_run(thread_signal_handling, NULL, "irdriver_thread");
-    if (!signal_hdl_thread) {
-        PERR("kthread creation failed.\n");
-        goto r_circular_buffer;
-    }
-
 
     return 0;
-r_circular_buffer:
-    kfree(circular_buffer);
 r_led_timer:
     release_led_timer();
     free_irq(gpio_irq_number, NULL);
