@@ -9,6 +9,8 @@
 #ifndef IRDRIVER_H
 # define IRDRIVER_H
 
+# include "linked_list.h"
+
 #undef PDEBUG
 #ifdef IRDRIVER_DEBUG
 #   ifdef __KERNEL__
@@ -41,6 +43,11 @@ typedef enum {
     LOW = 0,
     HIGH
 } GPIO_STATE;
+
+struct registered_app {
+    pid_t pid;
+    struct registered_app* next;
+};
 
 struct irdriver_dev {
     struct cdev cdev;

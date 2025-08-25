@@ -13,15 +13,20 @@
 #include <linux/kthread.h>
 #include <linux/completion.h>
 #include <linux/mutex.h>
+#include <asm/siginfo.h>
+#include <linux/sched.h>
 
 #include "irsignal.h"
 #include "irdriver.h"
 #include "irdriver_circular_buffer.h"
 #include "led.h"
+#include "irdriver_api.h"
 
 extern struct irdriver_circular_buffer *circular_buffer;
 extern struct mutex circular_buffer_mtx;
 extern struct completion signal_recv_completion;
+
+extern struct registered_app *registered_app_head;
 
 void read_ir_signal(struct ir_data *ir_data)
 {
@@ -110,17 +115,46 @@ irsignal_t identify_signal(struct ir_data *ir_data)
     return UNKNOW;
 }
 
+void signal_registered_app(int code)
+{
+    struct registered_app* app = registered_app_head;
+
+    while (app != NULL) {
+        struct kernel_siginfo info;
+        struct task_struct *t;
+
+        memset(&info, 0, sizeof(struct kernel_siginfo));
+        info.si_signo = SIGPOLL;
+        info.si_code = SI_QUEUE;
+        info.si_int = code;
+
+        t = pid_task(find_vpid(app->pid), PIDTYPE_PID);
+        if (t == NULL) {
+            PERR("signal_registered_app: Can't find task with pid %d\n", app->pid);
+        } else {
+            if (send_sig_info(SIGPOLL, &info, t) < 0 )  {
+                PERR("Unable to send signal to %d\n", app->pid);
+            }
+        }
+
+        app = app->next;
+    }
+}
+
 void process_irsignal(irsignal_t sig)
 {
     switch (sig) {
     case VOL_MINUS:
         PDEBUG("Signal catch: VOL_MINUS\n");
+        signal_registered_app(BTN_VOL_MINUS);
         break;
     case PLAY:
         PDEBUG("Signal catch: PLAY\n");
+        signal_registered_app(BTN_PLAY);
         break;
     case VOL_PLUS:
         PDEBUG("Signal catch: VOL_PLUS\n");
+        signal_registered_app(BTN_VOL_PLUS);
         break;
     case SETUP:
         PDEBUG("Signal catch: SETUP\n");

@@ -50,7 +50,7 @@ struct signal_pulses_s {
 # define PULSE_TIMEOUT  65000
 # define MAX_PULSES     50
 # define RESOLUTION     20
-# define FUZZINESS      20
+# define FUZZINESS      40
 
 struct ir_data {
     int pulses[MAX_PULSES][2];

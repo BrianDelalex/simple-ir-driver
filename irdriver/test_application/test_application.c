@@ -22,11 +22,10 @@ int main(void)
 
     action.sa_flags = (SA_SIGINFO | SA_RESTART);
     action.sa_sigaction = signal_handler;
-    if (sigaction(SIGNAL_IR, &action, NULL) != 0) {
+    if (sigaction(SIGPOLL, &action, NULL) != 0) {
         printf("%s: %s", __FUNCTION__, strerror(errno));
         return -1;
     }
-    printf("Signal set for SIGNAL_IR = %d\n", SIGNAL_IR);
     int fd = open("/dev/irdriver", O_RDONLY);
     if (fd == -1) {
         printf("Error while opening /dev/irdriver. %s\n", strerror(errno));

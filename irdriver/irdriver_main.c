@@ -21,6 +21,8 @@
 #include "irsignal.h"
 #include "irdriver_circular_buffer.h"
 #include "led.h"
+#include "irdriver_api.h"
+#include "linked_list.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("BrianDelalex");
@@ -34,6 +36,7 @@ static struct class *irdriver_class;
 
 unsigned int gpio_irq_number;
 
+struct registered_app *registered_app_head = NULL;
 
 static struct task_struct *signal_hdl_thread;
 struct irdriver_circular_buffer *circular_buffer;
@@ -78,17 +81,72 @@ restore_irq:
 *   FILE OPERATIONS 
 **************************/
 
+bool is_app_registered(struct registered_app* head, pid_t data)
+{
+    LL_EXISTS(registered_app, head, next, pid, data);
+}
+
+struct registered_app *unregister_app(struct registered_app* head, pid_t data)
+{
+    LL_REMOVE(registered_app, head, next, pid, data);
+}
+
 int irdriver_open(struct inode *inode, struct file* filp)
 {
-    PDEBUG("open called.\n");
-
+    PDEBUG("open called by %d.\n", current->pid);
     return 0;
 }
 
 int irdriver_release(struct inode *inode, struct file* filp)
 {
-    PDEBUG("release called.\n");
+    PDEBUG("release called by %d.\n", current->pid);
+    int pid = current->pid;
 
+    if (is_app_registered(registered_app_head, pid)) {
+        registered_app_head = unregister_app(registered_app_head, pid);
+    }
+
+    return 0;
+}
+
+long irdriver_ioctl_register(unsigned long arg)
+{
+    struct registered_app* app;
+    
+    if (registered_app_head && is_app_registered(registered_app_head, arg)) {
+        PDEBUG("App %ld is already registered\n", arg);
+        return -EINVAL;
+    }
+
+    app = kmalloc(sizeof(struct registered_app), GFP_KERNEL);
+    if (app == NULL) {
+        PERR("irdriver_ioctl_register: Out of memory!\n");
+        return -ENOMEM;
+    }
+
+    app->pid = arg;
+    app->next = NULL;
+
+    if (registered_app_head == NULL)
+        registered_app_head = app;
+    else {
+        LL_ADD(registered_app, registered_app_head, next, app);
+    }
+
+
+    return 0;
+}
+
+long irdriver_ioctl_unregister(unsigned long arg)
+{
+    registered_app_head = unregister_app(registered_app_head, arg);
+    return 0;
+}
+
+ssize_t irdriver_read(struct file *filp, char __user* buf, size_t count, loff_t *f_pos)
+{
+    PDEBUG("Dumping registered app: \n");
+    LL_DUMP(registered_app, registered_app_head, next, pid, "     Node: ");
     return 0;
 }
 
@@ -97,9 +155,17 @@ long irdriver_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
     long retval = -EINVAL;
 
     PDEBUG("ioctl called.\n");
-    gpio_set_value(GPIO_LED, (int) HIGH);
-    mdelay(2000);
-    gpio_set_value(GPIO_LED, (int) LOW);
+
+    switch (cmd) {
+    case CMD_REGISTER:
+        PDEBUG("CMD_REGISTER from %ld\n", arg);
+        return irdriver_ioctl_register(arg);
+    case CMD_UNREGISTER:
+        PDEBUG("CMD_UNREGISTER from %ld\n", arg);
+        break;
+    default:
+        return retval;
+    }
 
     retval = 0;
 
@@ -134,6 +200,7 @@ struct file_operations irdriver_fops = {
     .owner = THIS_MODULE,
     .open = irdriver_open,
     .release = irdriver_release,
+    .read = irdriver_read,
     .unlocked_ioctl = irdriver_ioctl,
 };
 
