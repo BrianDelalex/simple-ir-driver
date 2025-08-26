@@ -82,7 +82,7 @@ irsignal_t identify_signal(struct ir_data *ir_data)
                 arr_index++;
                 continue;
             }
-            if (count * 2 + 1 >= pulses_arr[arr_index].pulses_count) {
+            if (count * 2 + 1 >= pulses_arr[arr_index].pulses_count - 2) {
                 arr_index++;
                 continue;
             }
@@ -92,6 +92,7 @@ irsignal_t identify_signal(struct ir_data *ir_data)
             if (abs(oncode - comp_on) > (comp_on * FUZZINESS / 100)) {
                 pulses_arr[arr_index].valid = false;
             }
+
             if (abs(offcode - comp_off) > (comp_off * FUZZINESS / 100)) {
                 pulses_arr[arr_index].valid = false;
             }
@@ -221,12 +222,7 @@ irqreturn_t thread_signal_handling(int irq, void *dev_id)
     mutex_unlock(&circular_buffer_mtx);
     if (!ir_data)
         return IRQ_HANDLED;
-    int i = 0;
-    PDEBUG("ON, OFF\n");
-    while (i < ir_data->pulses_count) {
-        PDEBUG("%d, %d", ir_data->pulses[i][1] * RESOLUTION / 10, ir_data->pulses[i + 1][0] * RESOLUTION / 10);
-        i++;
-    }
+    
     irsignal_t sig = identify_signal(ir_data);
     if (sig != UNKNOW) {
         blink_led();
