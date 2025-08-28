@@ -49,7 +49,7 @@ struct signal_pulses_s {
     bool valid;
 };
 
-# define PULSE_TIMEOUT  65000
+# define PULSE_TIMEOUT  6000
 # define MAX_PULSES     50
 # define RESOLUTION     20
 # define FUZZINESS      40
