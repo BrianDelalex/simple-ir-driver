@@ -9,6 +9,10 @@
 #ifndef IRDRIVER_H
 # define IRDRIVER_H
 
+#ifdef __KERNEL__
+# include <linux/gpio/consumer.h>
+#endif
+
 # include "linked_list.h"
 
 #undef PDEBUG
@@ -33,6 +37,11 @@
 # define GPIO_LED               (24)
 # define GPIO_RECEIVER_DATA_LBL "GPIO_17"
 # define GPIO_LED_LBL           "GPIO_24"
+
+#ifdef __KERNEL__
+extern struct gpio_desc *gpio_receiver_desc;
+extern struct gpio_desc *gpio_led_desc;
+#endif
 
 typedef enum {
     OUTPUT,

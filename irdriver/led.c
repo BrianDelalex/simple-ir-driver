@@ -7,11 +7,13 @@
 \*****************************************************************************/
 
 #include <linux/cdev.h>
-#include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/timer.h>
 #include <linux/jiffies.h>
 
 #include "irdriver.h"
+
+extern struct gpio_desc *gpio_led_desc;
 
 static struct timer_list led_timer;
 
@@ -19,12 +21,14 @@ static struct timer_list led_timer;
 
 void led_timer_callback(struct timer_list * data)
 {
-    gpio_set_value(GPIO_LED, 0);
+    if (gpio_led_desc)
+        gpiod_set_value(gpio_led_desc, 0);
 }
 
 void blink_led(void)
 {
-    gpio_set_value(GPIO_LED, 1);
+    if (gpio_led_desc)
+        gpiod_set_value(gpio_led_desc, 1);
     mod_timer(&led_timer, jiffies + msecs_to_jiffies(BLINK_DURATION_MS));
 }
 

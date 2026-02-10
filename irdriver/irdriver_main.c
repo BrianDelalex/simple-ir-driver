@@ -8,7 +8,8 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
+#include <linux/gpio/machine.h>
 #include <linux/delay.h>
 #include <linux/cdev.h>
 #include <linux/fs.h>
@@ -16,6 +17,7 @@
 #include <linux/kthread.h>
 #include <linux/completion.h>
 #include <linux/mutex.h>
+#include <linux/platform_device.h>
 
 #include "irdriver.h"
 #include "irsignal.h"
@@ -35,8 +37,21 @@ struct irdriver_dev irdriver_device;
 static struct class *irdriver_class;
 
 unsigned int gpio_irq_number;
+struct gpio_desc *gpio_receiver_desc = NULL;
+struct gpio_desc *gpio_led_desc = NULL;
+struct platform_device *irdriver_pdev = NULL;
 
 struct registered_app *registered_app_head = NULL;
+
+/* GPIO lookup table for modern gpiod API */
+static struct gpiod_lookup_table irdriver_gpio_lookup = {
+    .dev_id = "irdriver-gpio",
+    .table = {
+        GPIO_LOOKUP("pinctrl-bcm2711", GPIO_RECEIVER_DATA, "receiver", GPIO_ACTIVE_HIGH),
+        GPIO_LOOKUP("pinctrl-bcm2711", GPIO_LED, "led", GPIO_ACTIVE_HIGH),
+        {},
+    },
+};
 
 struct irdriver_circular_buffer *circular_buffer;
 struct mutex circular_buffer_mtx;
@@ -171,25 +186,29 @@ long irdriver_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 int init_gpio(int index, const char* lbl, direction_t direction)
 {
-    if (!gpio_is_valid(index)) {
-        PERR("GPIO %d is not valid\n", index);
-        return -1;
-    }
+    struct gpio_desc *desc = NULL;
 
-    if (gpio_request(index, lbl) < 0) {
-        PERR("GPIO %d request failed\n", index);
-        return -1;
-    }
-
-    if (direction == OUTPUT) {
-        gpio_direction_output(index, (int) LOW);
+    /* Get GPIO descriptor using modern gpiod API */
+    if (index == GPIO_RECEIVER_DATA) {
+        desc = gpiod_get(&irdriver_pdev->dev, "receiver", GPIOD_IN);
+        if (IS_ERR(desc)) {
+            PERR("Failed to get receiver GPIO descriptor: %ld\n", PTR_ERR(desc));
+            return -1;
+        }
+        gpio_receiver_desc = desc;
+    } else if (index == GPIO_LED) {
+        desc = gpiod_get(&irdriver_pdev->dev, "led", GPIOD_OUT_LOW);
+        if (IS_ERR(desc)) {
+            PERR("Failed to get LED GPIO descriptor: %ld\n", PTR_ERR(desc));
+            return -1;
+        }
+        gpio_led_desc = desc;
     } else {
-        gpio_direction_input(index);
+        PERR("Unknown GPIO index: %d\n", index);
+        return -1;
     }
 
-    // Exporting for test purpose
-    gpio_export(index, false);
-
+    PDEBUG("GPIO %d initialized successfully\n", index);
     return 0;
 }
 
@@ -222,18 +241,28 @@ static int __init irdriver_init(void)
 
     int rc;
 
+    /* Register GPIO lookup table */
+    gpiod_add_lookup_table(&irdriver_gpio_lookup);
+
+    /* Create a dummy platform device for GPIO lookups */
+    irdriver_pdev = platform_device_register_simple("irdriver-gpio", -1, NULL, 0);
+    if (IS_ERR(irdriver_pdev)) {
+        PERR("Failed to register platform device\n");
+        return PTR_ERR(irdriver_pdev);
+    }
+
     rc = alloc_chrdev_region(&dev, irdriver_minor, 1, "irdriver");
     irdriver_major = MAJOR(dev);
     if (rc < 0) {
         PERR("Can't get major!\n");
-        return rc;
+        goto r_pdev;
     }
     memset(&irdriver_device, 0, sizeof(struct irdriver_dev));
 
     if (irdriver_setup_cdev(&irdriver_device) != 0)
         goto r_chrdev;
 
-    if (IS_ERR(irdriver_class = class_create(THIS_MODULE, "irdriver_class"))) {
+    if (IS_ERR(irdriver_class = class_create("irdriver_class"))) {
         PERR("Cannot create the struct class\n");
         goto r_class;
     }
@@ -251,7 +280,11 @@ static int __init irdriver_init(void)
         goto r_gpio_led;
     }
 
-    gpio_irq_number = gpio_to_irq(GPIO_RECEIVER_DATA);
+    gpio_irq_number = gpiod_to_irq(gpio_receiver_desc);
+    if (gpio_irq_number < 0) {
+        PERR("cannot get IRQ for GPIO\n");
+        goto r_gpio_led;
+    }
     if (request_threaded_irq(gpio_irq_number,
                     (void *)ir_signal_handler,
                     thread_signal_handling,
@@ -278,15 +311,20 @@ r_led_timer:
     release_led_timer();
     free_irq(gpio_irq_number, NULL);
 r_gpio_led:
-    gpio_free(GPIO_LED);
+    if (gpio_led_desc)
+        gpiod_put(gpio_led_desc);
 r_gpio_receiver_data:
-    gpio_free(GPIO_RECEIVER_DATA);
+    if (gpio_receiver_desc)
+        gpiod_put(gpio_receiver_desc);
 r_device:
     device_destroy(irdriver_class, dev);
 r_class:
     class_destroy(irdriver_class);
 r_chrdev:
     unregister_chrdev_region(dev, 1);
+r_pdev:
+    platform_device_unregister(irdriver_pdev);
+    gpiod_remove_lookup_table(&irdriver_gpio_lookup);
     return -1;
 }
 
@@ -300,15 +338,19 @@ static void __exit irdriver_exit(void)
 
     free_irq(gpio_irq_number, NULL);
 
-    gpio_unexport(GPIO_LED);
-    gpio_free(GPIO_LED);
-    
-    gpio_unexport(GPIO_RECEIVER_DATA);
-    gpio_free(GPIO_RECEIVER_DATA);
+    /* Release GPIO descriptors using modern API */
+    if (gpio_led_desc)
+        gpiod_put(gpio_led_desc);
+    if (gpio_receiver_desc)
+        gpiod_put(gpio_receiver_desc);
 
     device_destroy(irdriver_class, dev);
     class_destroy(irdriver_class);
     unregister_chrdev_region(dev, 1);
+
+    /* Cleanup platform device and GPIO lookup table */
+    platform_device_unregister(irdriver_pdev);
+    gpiod_remove_lookup_table(&irdriver_gpio_lookup);
 }
 
 module_init(irdriver_init);

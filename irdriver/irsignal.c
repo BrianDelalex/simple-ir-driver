@@ -8,7 +8,7 @@
 
 
 #include <linux/delay.h>
-#include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/cdev.h>
 #include <linux/kthread.h>
 #include <linux/completion.h>
@@ -26,6 +26,7 @@ extern struct irdriver_circular_buffer *circular_buffer;
 extern struct mutex circular_buffer_mtx;
 
 extern struct registered_app *registered_app_head;
+extern struct gpio_desc *gpio_receiver_desc;
 
 void read_ir_signal(struct ir_data *ir_data)
 {
@@ -34,7 +35,7 @@ void read_ir_signal(struct ir_data *ir_data)
     while (1) {
         int highpulse = 0;
         int lowpulse = 0;
-        while (gpio_get_value(GPIO_RECEIVER_DATA)) {
+        while (gpio_receiver_desc && gpiod_get_value(gpio_receiver_desc)) {
             highpulse++;
             udelay(RESOLUTION);
 
@@ -46,7 +47,7 @@ void read_ir_signal(struct ir_data *ir_data)
 
         ir_data->pulses[currentpulse][0] = highpulse;
 
-        while (gpio_get_value(GPIO_RECEIVER_DATA) == 0) {
+        while (gpio_receiver_desc && gpiod_get_value(gpio_receiver_desc) == 0) {
             lowpulse++;
             udelay(RESOLUTION);
             if (highpulse >= PULSE_TIMEOUT || currentpulse == MAX_PULSES) {
@@ -69,6 +70,10 @@ irsignal_t identify_signal(struct ir_data *ir_data)
     struct signal_pulses_s* pulses_arr = get_signal_pulses_array(&pulses_arr_size);
 
     if (pulses_arr == NULL) {
+        return UNKNOW;
+    }
+
+    if (pulses < 10) {
         return UNKNOW;
     }
 
